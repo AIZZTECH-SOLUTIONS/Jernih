@@ -1,22 +1,38 @@
 {
   "expo": {
-    "name": "whatsapp-status-keeper",
+    "name": "Status Quality Keeper",
     "slug": "whatsapp-status-keeper",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "whatsappstatuskeeper",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.syahrul.whatsappstatuskeeper",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Pick photos and videos to optimize for WhatsApp Status.",
+        "NSPhotoLibraryAddUsageDescription": "Save optimized media to your photo library.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
+      "package": "com.syahrul.whatsappstatuskeeper",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#0b141a",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
+      "permissions": [
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.READ_MEDIA_AUDIO"
+      ],
       "predictiveBackGestureEnabled": false
     },
     "web": {
@@ -31,12 +47,35 @@
         {
           "image": "./assets/images/splash-icon.png",
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
+          "backgroundColor": "#000000"
         }
-      ]
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Pick photos and videos to optimize for WhatsApp Status."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Save optimized media to your photo library.",
+          "savePhotosPermission": "Save optimized media to your photo library."
+        }
+      ],
+      "expo-secure-store",
+      "expo-sharing",
+      "expo-video"
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "b2d7600a-cd5d-44bd-bd87-78de3926a9ec"
+      }
+    },
+    "owner": "syahrulsss"
   }
 }
