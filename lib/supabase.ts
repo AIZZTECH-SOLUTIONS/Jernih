@@ -40,7 +40,7 @@ export async function signInWithEmail(email: string): Promise<void> {
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
-      emailRedirectTo: 'whatsappstatuskeeper://auth/callback',
+      emailRedirectTo: 'jernih://auth/callback',
     },
   });
   if (error) throw error;

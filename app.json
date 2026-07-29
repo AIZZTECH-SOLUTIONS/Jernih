@@ -1,15 +1,15 @@
 {
   "expo": {
-    "name": "Status Quality Keeper",
-    "slug": "whatsapp-status-keeper",
+    "name": "Jernih",
+    "slug": "jernih",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "whatsappstatuskeeper",
+    "scheme": "jernih",
     "userInterfaceStyle": "dark",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.syahrul.whatsappstatuskeeper",
+      "bundleIdentifier": "com.aizztech.jernih",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Pick photos and videos to optimize for WhatsApp Status.",
         "NSPhotoLibraryAddUsageDescription": "Save optimized media to your photo library.",
@@ -17,7 +17,7 @@
       }
     },
     "android": {
-      "package": "com.syahrul.whatsappstatuskeeper",
+      "package": "com.aizztech.jernih",
       "adaptiveIcon": {
         "backgroundColor": "#0b141a",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -47,7 +47,7 @@
         {
           "image": "./assets/images/splash-icon.png",
           "resizeMode": "contain",
-          "backgroundColor": "#000000"
+          "backgroundColor": "#ffffff"
         }
       ],
       [

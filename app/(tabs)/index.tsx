@@ -184,7 +184,7 @@ export default function HomeScreen() {
       {step === 'pick' ? (
         <View style={styles.landing}>
           <View style={styles.landingHeader}>
-            <Text style={styles.brand}>Status Keeper</Text>
+            <Text style={styles.brand}>Jernih</Text>
             <Text style={styles.brandSub}>Keep your WhatsApp status sharp.</Text>
           </View>
 

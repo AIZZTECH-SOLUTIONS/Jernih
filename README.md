@@ -30,7 +30,7 @@ cp .env.example .env
 1. Create a [Supabase](https://supabase.com) project.
 2. Run [`supabase/schema.sql`](supabase/schema.sql) in the Supabase SQL editor.
 3. Copy your project URL and anon key into `.env`.
-4. In Supabase Auth → URL configuration, add redirect URL: `whatsappstatuskeeper://auth/callback`
+4. In Supabase Auth → URL configuration, add redirect URL: `jernih://auth/callback`
 
 ## Run on device (dev build required)
 
