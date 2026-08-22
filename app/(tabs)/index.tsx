@@ -8,6 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import * as Linking from 'expo-linking';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { SymbolView } from 'expo-symbols';
 import { randomUUID } from 'expo-crypto';
@@ -32,17 +33,23 @@ import {
   formatReduction,
 } from '@/lib/format';
 import { pickMedia, saveToPhotos, shareToWhatsAppChat } from '@/lib/media';
-import { recordJob, uploadProcessed } from '@/lib/supabase';
+import {
+  deliverJobToWhatsApp,
+  recordJob,
+  uploadProcessed,
+} from '@/lib/supabase';
 
 const HOW_IT_WORKS = [
   { icon: 'wand.and.stars', title: 'Optimize', detail: 'Tune it to stay sharp on Status' },
-  { icon: 'bubble.left', title: 'Send to chat', detail: 'Share to yourself or a contact first' },
+  { icon: 'bubble.left', title: 'Receive in chat', detail: 'Jernih sends it to your WhatsApp' },
   { icon: 'arrowshape.turn.up.forward', title: 'Forward', detail: 'Forward the media to My Status' },
 ] as const;
 
+type DeliveryStatus = 'idle' | 'sending' | 'sent' | 'failed';
+
 export default function HomeScreen() {
   const { user } = useAuth();
-  const { videoPreset, codec, cloudBackup } = useSettings();
+  const { videoPreset, codec, cloudBackup, autoWhatsAppDelivery } = useSettings();
 
   const [step, setStep] = useState<FlowStep>('pick');
   const [progress, setProgress] = useState(0);
@@ -54,6 +61,8 @@ export default function HomeScreen() {
   const [outputAnalysis, setOutputAnalysis] = useState<MediaAnalysis | null>(null);
   const [skippedEncode, setSkippedEncode] = useState(false);
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [deliveryStatus, setDeliveryStatus] = useState<DeliveryStatus>('idle');
+  const [deliveryJobId, setDeliveryJobId] = useState<string | null>(null);
 
   const previewUri = outputUri ?? original?.uri ?? null;
   const isVideo = (output ?? original)?.mediaType === 'video';
@@ -70,6 +79,8 @@ export default function HomeScreen() {
     setOutputUri(null);
     setOutputAnalysis(null);
     setSkippedEncode(false);
+    setDeliveryStatus('idle');
+    setDeliveryJobId(null);
 
     try {
       const picked = await pickMedia();
@@ -98,7 +109,7 @@ export default function HomeScreen() {
       const result =
         original.mediaType === 'video'
           ? await optimizeVideo(original.uri, videoPreset, codec, setProgress)
-          : await optimizeImage(original.uri);
+          : await optimizeImage(original.uri, autoWhatsAppDelivery);
 
       setOutputUri(result.uri);
       setOutput(result.info);
@@ -107,11 +118,17 @@ export default function HomeScreen() {
       setStep('share');
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-      if (user && cloudBackup) {
+      if (autoWhatsAppDelivery && !user) {
+        setDeliveryStatus('failed');
+        setError('Sign in and save your WhatsApp number to enable automatic delivery.');
+      } else if (user && (cloudBackup || autoWhatsAppDelivery)) {
         const jobId = randomUUID();
+        if (autoWhatsAppDelivery) setDeliveryStatus('sending');
+
         try {
           const outputPath = await uploadProcessed(user.id, jobId, result.uri, original.mediaType);
           await recordJob({
+            id: jobId,
             user_id: user.id,
             media_type: original.mediaType,
             original_bytes: original.sizeBytes,
@@ -120,8 +137,24 @@ export default function HomeScreen() {
             codec: original.mediaType === 'video' ? codec : 'jpeg',
             output_path: outputPath,
           });
-        } catch {
-          // Cloud backup is optional.
+          setDeliveryJobId(jobId);
+
+          if (autoWhatsAppDelivery) {
+            await deliverJobToWhatsApp(jobId);
+            setDeliveryStatus('sent');
+            setStep('forward');
+            await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          }
+        } catch (deliveryError) {
+          if (autoWhatsAppDelivery) {
+            setDeliveryStatus('failed');
+            setError(
+              deliveryError instanceof Error
+                ? deliveryError.message
+                : 'Could not send the file to WhatsApp.',
+            );
+          }
+          // Cloud backup remains optional when automatic delivery is disabled.
         }
       }
     } catch (err) {
@@ -129,7 +162,32 @@ export default function HomeScreen() {
       setError(err instanceof Error ? err.message : 'Something went wrong. Try again.');
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
-  }, [original, videoPreset, codec, user, cloudBackup]);
+  }, [
+    original,
+    videoPreset,
+    codec,
+    user,
+    cloudBackup,
+    autoWhatsAppDelivery,
+  ]);
+
+  const handleRetryDelivery = useCallback(async () => {
+    if (!deliveryJobId) return;
+    setBusyAction('delivery');
+    setDeliveryStatus('sending');
+    setError(null);
+    try {
+      await deliverJobToWhatsApp(deliveryJobId);
+      setDeliveryStatus('sent');
+      setStep('forward');
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (err) {
+      setDeliveryStatus('failed');
+      setError(err instanceof Error ? err.message : 'Could not send the file to WhatsApp.');
+    } finally {
+      setBusyAction(null);
+    }
+  }, [deliveryJobId]);
 
   const handleShareToChat = useCallback(async () => {
     if (!outputUri || !original) return;
@@ -149,7 +207,7 @@ export default function HomeScreen() {
     if (!outputUri || !original) return;
     setBusyAction('save');
     try {
-      await saveToPhotos(outputUri, original.mediaType);
+      await saveToPhotos(outputUri);
       Alert.alert('Saved', 'Optimized file saved to your photo library.');
     } catch (err) {
       Alert.alert('Error', err instanceof Error ? err.message : 'Could not save.');
@@ -163,6 +221,19 @@ export default function HomeScreen() {
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   }, []);
 
+  const handleOpenWhatsApp = useCallback(async () => {
+    try {
+      const appUrl = 'whatsapp://';
+      if (await Linking.canOpenURL(appUrl)) {
+        await Linking.openURL(appUrl);
+      } else {
+        await Linking.openURL('https://wa.me/');
+      }
+    } catch {
+      Alert.alert('WhatsApp unavailable', 'Open WhatsApp and look for the Jernih chat.');
+    }
+  }, []);
+
   const handleReset = useCallback(() => {
     setStep('pick');
     setOriginal(null);
@@ -173,6 +244,8 @@ export default function HomeScreen() {
     setSkippedEncode(false);
     setProgress(0);
     setError(null);
+    setDeliveryStatus('idle');
+    setDeliveryJobId(null);
   }, []);
 
   const issueList = useMemo(() => analysis?.issues ?? [], [analysis]);
@@ -333,13 +406,25 @@ export default function HomeScreen() {
                   tintColor={Theme.colors.white}
                 />
                 <Text style={styles.noticeText}>
-                  Don&apos;t post to Status directly. Send to a chat first — you&apos;ll Forward it next.
+                  {autoWhatsAppDelivery
+                    ? deliveryStatus === 'sending'
+                      ? 'Jernih is sending this file to your WhatsApp now.'
+                      : 'Jernih could not deliver automatically. You can retry or use the share sheet.'
+                    : 'Send this to a WhatsApp chat first, then Forward it to My Status.'}
                 </Text>
               </Card>
 
               <View style={styles.actions}>
+                {autoWhatsAppDelivery && deliveryStatus === 'failed' && deliveryJobId ? (
+                  <Button
+                    label="Retry WhatsApp delivery"
+                    onPress={handleRetryDelivery}
+                    loading={busyAction === 'delivery'}
+                  />
+                ) : null}
                 <Button
-                  label="Send to WhatsApp Chat"
+                  label={autoWhatsAppDelivery ? 'Use share sheet instead' : 'Send to WhatsApp Chat'}
+                  variant={autoWhatsAppDelivery ? 'secondary' : 'primary'}
                   onPress={handleShareToChat}
                   loading={busyAction === 'share'}
                 />
@@ -357,13 +442,8 @@ export default function HomeScreen() {
             <View style={styles.section}>
               <ForwardGuide />
               <View style={styles.actions}>
+                <Button label="Open WhatsApp" onPress={handleOpenWhatsApp} />
                 <Button label="I've posted to Status" onPress={handleComplete} />
-                <Button
-                  label="Re-share to chat"
-                  variant="secondary"
-                  onPress={handleShareToChat}
-                  loading={busyAction === 'share'}
-                />
               </View>
             </View>
           )}

@@ -36,6 +36,12 @@ export type JobRecord = {
   created_at: string;
 };
 
+export type WhatsAppDeliveryResult = {
+  delivered: true;
+  messageId: string;
+  duplicate?: boolean;
+};
+
 export async function signInWithEmail(email: string): Promise<void> {
   const { error } = await supabase.auth.signInWithOtp({
     email,
@@ -67,7 +73,8 @@ export async function uploadProcessed(
   uri: string,
   mediaType: 'image' | 'video',
 ): Promise<string> {
-  const ext = mediaType === 'video' ? 'mp4' : 'jpg';
+  const uploadType = getUploadType(uri, mediaType);
+  const ext = uploadType.extension;
   const path = `${userId}/${jobId}.${ext}`;
 
   // Blob uploads from fetch() produce 0-byte files on React Native, so read the
@@ -78,7 +85,7 @@ export async function uploadProcessed(
   const arrayBuffer = decode(base64);
 
   const { error } = await supabase.storage.from('processed').upload(path, arrayBuffer, {
-    contentType: mediaType === 'video' ? 'video/mp4' : 'image/jpeg',
+    contentType: uploadType.contentType,
     upsert: true,
   });
 
@@ -87,6 +94,7 @@ export async function uploadProcessed(
 }
 
 export async function recordJob(input: {
+  id: string;
   user_id: string;
   media_type: 'image' | 'video';
   original_bytes: number;
@@ -115,4 +123,77 @@ export async function getSignedUrl(path: string): Promise<string> {
   const { data, error } = await supabase.storage.from('processed').createSignedUrl(path, 3600);
   if (error) throw error;
   return data.signedUrl;
+}
+
+export async function getWhatsAppPhone(userId: string): Promise<string> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('whatsapp_phone')
+    .eq('id', userId)
+    .single();
+  if (error) throw error;
+  return typeof data?.whatsapp_phone === 'string' ? data.whatsapp_phone : '';
+}
+
+export async function updateWhatsAppPhone(userId: string, phone: string): Promise<string> {
+  const normalized = normalizeWhatsAppPhone(phone);
+  if (!normalized) {
+    throw new Error('Enter a valid WhatsApp number with country code.');
+  }
+
+  const { error } = await supabase
+    .from('profiles')
+    .upsert({ id: userId, whatsapp_phone: normalized }, { onConflict: 'id' });
+  if (error) throw error;
+  return normalized;
+}
+
+export async function deliverJobToWhatsApp(jobId: string): Promise<WhatsAppDeliveryResult> {
+  const { data, error } = await supabase.functions.invoke('send-whatsapp-media', {
+    body: { jobId },
+  });
+
+  if (error) {
+    let message = error.message;
+    const context = (error as { context?: Response }).context;
+    if (context) {
+      try {
+        const payload = await context.clone().json();
+        if (typeof payload?.error === 'string') message = payload.error;
+      } catch {
+        // Keep the Supabase client error when the response is not JSON.
+      }
+    }
+    throw new Error(message);
+  }
+  if (!data?.delivered || typeof data?.messageId !== 'string') {
+    throw new Error('Jernih could not confirm WhatsApp delivery.');
+  }
+  return data as WhatsAppDeliveryResult;
+}
+
+export function normalizeWhatsAppPhone(phone: string): string | null {
+  const normalized = phone.replace(/\D/g, '');
+  return normalized.length >= 8 && normalized.length <= 15 ? normalized : null;
+}
+
+function getUploadType(
+  uri: string,
+  mediaType: 'image' | 'video',
+): { extension: string; contentType: string } {
+  const path = uri.split(/[?#]/, 1)[0];
+  const extension = path.match(/\.([a-zA-Z0-9]+)$/)?.[1]?.toLowerCase();
+
+  if (mediaType === 'video' && extension === 'mov') {
+    return { extension: 'mov', contentType: 'video/quicktime' };
+  }
+  if (mediaType === 'image' && extension === 'png') {
+    return { extension: 'png', contentType: 'image/png' };
+  }
+  if (mediaType === 'image' && (extension === 'heic' || extension === 'heif')) {
+    return { extension, contentType: `image/${extension}` };
+  }
+  return mediaType === 'video'
+    ? { extension: 'mp4', contentType: 'video/mp4' }
+    : { extension: 'jpg', contentType: 'image/jpeg' };
 }

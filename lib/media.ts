@@ -9,6 +9,12 @@ export type PickedMedia = {
   fileName?: string | null;
 };
 
+type PreparedShare = {
+  uri: string;
+  mimeType: string;
+  UTI: string;
+};
+
 export async function requestMediaPermissions(): Promise<boolean> {
   const picker = await ImagePicker.requestMediaLibraryPermissionsAsync();
   const library = await MediaLibrary.requestPermissionsAsync();
@@ -40,27 +46,28 @@ export async function pickMedia(): Promise<PickedMedia | null> {
   };
 }
 
-/** Copy to cache with a clean extension so WhatsApp recognizes the file type. */
+/** Copy to cache without changing the file's actual container/format. */
 export async function prepareForShare(
   uri: string,
   mediaType: 'image' | 'video',
-): Promise<string> {
-  const ext = mediaType === 'video' ? 'mp4' : 'jpg';
+): Promise<PreparedShare> {
+  const sourceExt = getFileExtension(uri);
+  const ext = sourceExt ?? (mediaType === 'video' ? 'mp4' : 'jpg');
   const dest = `${FileSystem.cacheDirectory}status_${Date.now()}.${ext}`;
 
-  if (uri === dest) return uri;
-
   await FileSystem.copyAsync({ from: uri, to: dest });
-  return dest;
+  return {
+    uri: dest,
+    ...getShareType(mediaType, ext),
+  };
 }
 
-export async function saveToPhotos(uri: string, mediaType: 'image' | 'video'): Promise<void> {
+export async function saveToPhotos(uri: string): Promise<void> {
   const { granted } = await MediaLibrary.requestPermissionsAsync();
   if (!granted) {
     throw new Error('Permission is required to save to your photo library.');
   }
-  const prepared = await prepareForShare(uri, mediaType);
-  await MediaLibrary.saveToLibraryAsync(prepared);
+  await MediaLibrary.saveToLibraryAsync(uri);
 }
 
 /**
@@ -78,9 +85,33 @@ export async function shareToWhatsAppChat(
 
   const prepared = await prepareForShare(uri, mediaType);
 
-  await Sharing.shareAsync(prepared, {
+  await Sharing.shareAsync(prepared.uri, {
     dialogTitle: 'Send to WhatsApp Chat',
-    mimeType: mediaType === 'video' ? 'video/mp4' : 'image/jpeg',
-    UTI: mediaType === 'video' ? 'public.mpeg-4' : 'public.jpeg',
+    mimeType: prepared.mimeType,
+    UTI: prepared.UTI,
   });
+}
+
+function getFileExtension(uri: string): string | null {
+  const path = uri.split(/[?#]/, 1)[0];
+  const match = path.match(/\.([a-zA-Z0-9]+)$/);
+  return match?.[1]?.toLowerCase() ?? null;
+}
+
+function getShareType(
+  mediaType: 'image' | 'video',
+  extension: string,
+): Pick<PreparedShare, 'mimeType' | 'UTI'> {
+  if (mediaType === 'video' && extension === 'mov') {
+    return { mimeType: 'video/quicktime', UTI: 'com.apple.quicktime-movie' };
+  }
+  if (mediaType === 'image' && (extension === 'heic' || extension === 'heif')) {
+    return { mimeType: `image/${extension}`, UTI: `public.${extension}` };
+  }
+  if (mediaType === 'image' && extension === 'png') {
+    return { mimeType: 'image/png', UTI: 'public.png' };
+  }
+  return mediaType === 'video'
+    ? { mimeType: 'video/mp4', UTI: 'public.mpeg-4' }
+    : { mimeType: 'image/jpeg', UTI: 'public.jpeg' };
 }

@@ -14,6 +14,7 @@ type SettingsContextValue = AppSettings & {
   setVideoPreset: (preset: VideoPreset) => Promise<void>;
   setCodec: (codec: Codec) => Promise<void>;
   setCloudBackup: (enabled: boolean) => Promise<void>;
+  setAutoWhatsAppDelivery: (enabled: boolean) => Promise<void>;
 };
 
 const SettingsContext = createContext<SettingsContextValue>({
@@ -22,6 +23,7 @@ const SettingsContext = createContext<SettingsContextValue>({
   setVideoPreset: async () => {},
   setCodec: async () => {},
   setCloudBackup: async () => {},
+  setAutoWhatsAppDelivery: async () => {},
 });
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
@@ -58,6 +60,12 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     [persist],
   );
 
+  const setAutoWhatsAppDelivery = useCallback(
+    async (autoWhatsAppDelivery: boolean) =>
+      persist((current) => ({ ...current, autoWhatsAppDelivery })),
+    [persist],
+  );
+
   const value = useMemo(
     () => ({
       ...settings,
@@ -65,8 +73,16 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       setVideoPreset,
       setCodec,
       setCloudBackup,
+      setAutoWhatsAppDelivery,
     }),
-    [settings, loading, setVideoPreset, setCodec, setCloudBackup],
+    [
+      settings,
+      loading,
+      setVideoPreset,
+      setCodec,
+      setCloudBackup,
+      setAutoWhatsAppDelivery,
+    ],
   );
 
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;

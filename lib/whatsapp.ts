@@ -1,27 +1,33 @@
-/** WhatsApp Status envelope — derived from proven bypass metadata. */
+/**
+ * Conservative export targets for a high-quality WhatsApp hand-off.
+ *
+ * `expo-image-and-video-compressor` treats `maxSize` as the longest edge, so
+ * Full HD portrait video needs a value of 1920 (not 1080).
+ */
 export const WHATSAPP_LIMITS = {
   maxVideoDurationSec: 60,
   recommendedVideoDurationSec: 30,
-  maxVideoBitrate: 3_800_000,
-  targetVideoBitrate: 3_500_000,
-  hdVideoBitrate: 5_000_000,
-  maxVideoDimension: 1080,
+  maxVideoBitrate: 12_000_000,
+  targetVideoBitrate: 8_000_000,
+  hdVideoBitrate: 12_000_000,
+  maxVideoDimension: 1920,
+  maxVideoSizeBytes: 16 * 1024 * 1024,
+  targetVideoSizeBytes: 15 * 1024 * 1024,
+  audioBitrate: 128_000,
   maxImageEdge: 1600,
   maxImageQuality: 0.85,
-  maxVideoSizeBytes: 16 * 1024 * 1024,
-  targetVideoSizeBytes: 3 * 1024 * 1024,
 } as const;
 
 export const FORWARD_STEPS = [
   {
     step: 1,
-    title: 'Send to a chat',
-    detail: 'Share the optimized file to yourself or a trusted contact. Use "Message Yourself" if available.',
+    title: 'Open WhatsApp',
+    detail: 'Open WhatsApp and find the message sent by the Jernih business account.',
   },
   {
     step: 2,
-    title: 'Open the chat',
-    detail: 'Go to the WhatsApp chat where you just sent the video or photo.',
+    title: 'Select the media',
+    detail: 'Long-press the video or photo that Jernih sent to you.',
   },
   {
     step: 3,

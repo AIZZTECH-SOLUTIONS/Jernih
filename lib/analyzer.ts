@@ -67,9 +67,10 @@ export function analyzeMedia(info: MediaInfo): MediaAnalysis {
       issues.push({
         code: 'size_critical',
         severity: 'critical',
-        message: 'File is very large — WhatsApp will lower its quality.',
+        message: 'Video exceeds the WhatsApp media-message limit.',
       });
     }
+
   } else {
     const longest = Math.max(info.width ?? 0, info.height ?? 0);
     if (longest > WHATSAPP_LIMITS.maxImageEdge * 1.2) {
@@ -107,7 +108,10 @@ export function analyzeMedia(info: MediaInfo): MediaAnalysis {
   const estimatedOutputBytes =
     info.mediaType === 'video' && info.duration
       ? Math.round(
-          ((WHATSAPP_LIMITS.targetVideoBitrate * info.duration) / 8) * 1.1,
+          Math.min(
+            info.sizeBytes,
+            WHATSAPP_LIMITS.targetVideoSizeBytes,
+          ),
         )
       : Math.round(info.sizeBytes * 0.4);
 

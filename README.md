@@ -1,13 +1,12 @@
 # WhatsApp Status Quality Keeper
 
-Pre-encode photos and videos into WhatsApp's safe envelope on-device so WhatsApp passes them through with minimal re-compression.
+Prepare photos and videos on-device, then optionally have the Jernih WhatsApp Business account deliver the result to the user's chat for forwarding to Status.
 
 ## How it works
 
-WhatsApp aggressively re-compresses status media that is too large, high-bitrate, or high-fps. This app re-encodes media **before** you post:
+The app preserves media that is already suitable and only re-encodes oversized or unusually high-bitrate media:
 
-- **Video (Status preset):** H.264, max 1080p, ~3.5 Mbps — matches proven WhatsApp-safe output
-- **Video (HD preset):** ~5.0 Mbps
+- **Video:** H.264 MP4, up to 1080×1920, with a duration-aware bitrate that stays within the WhatsApp media-message limit
 - **Photo:** longest edge 1600px, JPEG quality 0.85
 
 Optional Supabase auth backs up optimized files and keeps a job history.
@@ -31,6 +30,32 @@ cp .env.example .env
 2. Run [`supabase/schema.sql`](supabase/schema.sql) in the Supabase SQL editor.
 3. Copy your project URL and anon key into `.env`.
 4. In Supabase Auth → URL configuration, add redirect URL: `jernih://auth/callback`
+
+## Automatic WhatsApp delivery
+
+Automatic delivery uses a protected Supabase Edge Function. The Meta access token is never included in the mobile app.
+
+1. Create a WhatsApp Business Platform app, register the Jernih business number, and create approved utility templates with dynamic **video** and **image** headers.
+2. Apply `supabase/schema.sql` to add the WhatsApp profile and delivery tables.
+3. Configure the server secrets:
+
+```bash
+supabase secrets set \
+  WHATSAPP_ACCESS_TOKEN=... \
+  WHATSAPP_PHONE_NUMBER_ID=... \
+  WHATSAPP_GRAPH_API_VERSION=... \
+  WHATSAPP_VIDEO_TEMPLATE_NAME=... \
+  WHATSAPP_IMAGE_TEMPLATE_NAME=... \
+  WHATSAPP_TEMPLATE_LANGUAGE=en_US
+```
+
+4. Deploy the authenticated function:
+
+```bash
+supabase functions deploy send-whatsapp-media
+```
+
+In the app, sign in, save the destination number under **Settings → WhatsApp delivery**, and enable **Send automatically**.
 
 ## Run on device (dev build required)
 
@@ -60,8 +85,8 @@ npx expo start --dev-client
 
 1. **Select** a photo or video
 2. **Review** the WhatsApp safety analysis
-3. **Encode** into the safe envelope (~3.5 Mbps H.264)
-4. **Send to WhatsApp Chat** — share to yourself or a contact (not Status yet)
+3. **Prepare** the file (preserving it when it is already suitable)
+4. Jernih automatically sends the result to the user's WhatsApp chat
 5. In WhatsApp: **long-press → Forward → My Status**
 6. Post
 
