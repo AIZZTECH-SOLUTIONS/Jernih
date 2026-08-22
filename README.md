@@ -35,7 +35,9 @@ cp .env.example .env
 
 Automatic delivery uses a protected Supabase Edge Function. The Meta access token is never included in the mobile app.
 
-1. Create a WhatsApp Business Platform app, register the Jernih business number, and create approved utility templates with dynamic **video** and **image** headers.
+The function downloads the processed file from storage, uploads it to the WhatsApp Media API, and sends it by media ID as a **free-form message** — no approved template needed, as long as the user has messaged the Jernih business number within the last 24 hours (the customer service window). Outside that window it falls back to an approved template if one is configured; otherwise it asks the user to message the business number first and retry.
+
+1. Create a WhatsApp Business Platform app and register the Jernih business number. Approved utility templates with dynamic **video**/**image** headers are optional (used only outside the 24h window).
 2. Apply `supabase/schema.sql` to add the WhatsApp profile and delivery tables.
 3. Configure the server secrets:
 
@@ -44,6 +46,7 @@ supabase secrets set \
   WHATSAPP_ACCESS_TOKEN=... \
   WHATSAPP_PHONE_NUMBER_ID=... \
   WHATSAPP_GRAPH_API_VERSION=... \
+  WHATSAPP_BUSINESS_DISPLAY_NUMBER=... \
   WHATSAPP_VIDEO_TEMPLATE_NAME=... \
   WHATSAPP_IMAGE_TEMPLATE_NAME=... \
   WHATSAPP_TEMPLATE_LANGUAGE=en_US
@@ -55,7 +58,7 @@ supabase secrets set \
 supabase functions deploy send-whatsapp-media
 ```
 
-In the app, sign in, save the destination number under **Settings → WhatsApp delivery**, and enable **Send automatically**.
+In the app, sign in, save the destination number under **Settings → WhatsApp delivery**, enable **Send automatically**, and send one message to the Jernih number on WhatsApp to open the delivery window.
 
 ## Run on device (dev build required)
 
