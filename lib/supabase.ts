@@ -148,6 +148,30 @@ export async function updateWhatsAppPhone(userId: string, phone: string): Promis
   return normalized;
 }
 
+export async function deleteAccount(): Promise<void> {
+  const { data, error } = await supabase.functions.invoke('delete-account', { body: {} });
+
+  if (error) {
+    let message = error.message;
+    const context = (error as { context?: Response }).context;
+    if (context) {
+      try {
+        const payload = await context.clone().json();
+        if (typeof payload?.error === 'string') message = payload.error;
+      } catch {
+        // Keep the Supabase client error when the response is not JSON.
+      }
+    }
+    throw new Error(message);
+  }
+  if (!data?.deleted) {
+    throw new Error('Jernih could not confirm the account deletion.');
+  }
+
+  // The server already removed the user; clear the local session.
+  await supabase.auth.signOut().catch(() => {});
+}
+
 export async function deliverJobToWhatsApp(jobId: string): Promise<WhatsAppDeliveryResult> {
   const { data, error } = await supabase.functions.invoke('send-whatsapp-media', {
     body: { jobId },

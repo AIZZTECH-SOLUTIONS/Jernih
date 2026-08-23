@@ -52,13 +52,17 @@ supabase secrets set \
   WHATSAPP_TEMPLATE_LANGUAGE=en_US
 ```
 
-4. Deploy the authenticated function:
+4. Deploy the authenticated functions:
 
 ```bash
-supabase functions deploy send-whatsapp-media
+supabase functions deploy send-whatsapp-media delete-account
 ```
 
 In the app, sign in, save the destination number under **Settings → WhatsApp delivery**, enable **Send automatically**, and send one message to the Jernih number on WhatsApp to open the delivery window.
+
+## Privacy & account deletion
+
+The privacy policy lives at [`docs/privacy.html`](docs/privacy.html), published via GitHub Pages at `https://syahrulx.github.io/Jernih/privacy.html` — use this URL in App Store Connect and the Play Console (it also serves as Play's required account-deletion web resource). Users can delete their account and all data in-app via **Settings → Account → Delete account**, backed by the `delete-account` edge function.
 
 ## Run on device (dev build required)
 

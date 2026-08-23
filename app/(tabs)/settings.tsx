@@ -9,6 +9,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import * as Linking from 'expo-linking';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -16,8 +17,10 @@ import { Theme } from '@/constants/Theme';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSettings } from '@/contexts/SettingsContext';
-import { getWhatsAppPhone, signOut, updateWhatsAppPhone } from '@/lib/supabase';
+import { deleteAccount, getWhatsAppPhone, signOut, updateWhatsAppPhone } from '@/lib/supabase';
 import type { Codec, VideoPreset } from '@/lib/settings';
+
+const PRIVACY_POLICY_URL = 'https://syahrulx.github.io/Jernih/privacy.html';
 
 const PRESETS: { id: VideoPreset; label: string; detail: string }[] = [
   { id: 'status', label: 'Best for Status', detail: 'Recommended for sharing' },
@@ -43,6 +46,7 @@ export default function SettingsScreen() {
   } = useSettings();
   const [whatsappPhone, setWhatsAppPhone] = useState('');
   const [phoneLoading, setPhoneLoading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -78,6 +82,35 @@ export default function SettingsScreen() {
     } catch (err) {
       Alert.alert('Error', err instanceof Error ? err.message : 'Could not sign out.');
     }
+  }
+
+  function handleDeleteAccount() {
+    Alert.alert(
+      'Delete account?',
+      'This permanently deletes your account, uploaded files, job history, and WhatsApp delivery records. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setDeleting(true);
+            try {
+              await deleteAccount();
+              router.replace('/(auth)/sign-in');
+              Alert.alert('Account deleted', 'Your account and data have been removed.');
+            } catch (err) {
+              Alert.alert(
+                'Could not delete account',
+                err instanceof Error ? err.message : 'Try again.',
+              );
+            } finally {
+              setDeleting(false);
+            }
+          },
+        },
+      ],
+    );
   }
 
   return (
@@ -188,12 +221,29 @@ export default function SettingsScreen() {
             <Pressable style={styles.signOut} onPress={handleSignOut}>
               <Text style={styles.signOutText}>Sign out</Text>
             </Pressable>
+            <Pressable style={styles.signOut} onPress={handleDeleteAccount} disabled={deleting}>
+              <Text style={styles.signOutText}>
+                {deleting ? 'Deleting account…' : 'Delete account'}
+              </Text>
+            </Pressable>
           </>
         ) : (
           <Pressable style={styles.row} onPress={() => router.push('/(auth)/sign-in')}>
             <Text style={styles.signInText}>Sign in</Text>
           </Pressable>
         )}
+      </View>
+
+      <Text style={styles.section}>About</Text>
+      <View style={styles.card}>
+        <Pressable
+          style={styles.row}
+          onPress={() => Linking.openURL(PRIVACY_POLICY_URL).catch(() => {})}>
+          <View style={styles.rowText}>
+            <Text style={styles.rowLabel}>Privacy Policy</Text>
+            <Text style={styles.rowDetail}>How Jernih handles your data</Text>
+          </View>
+        </Pressable>
       </View>
     </ScrollView>
   );
