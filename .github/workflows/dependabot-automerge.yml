@@ -1,0 +1,55 @@
+# Merge Dependabot PRs automatically once CI passes - patch and minor updates only.
+# Major updates (and anything whose versions can't be read) stay open for a human.
+#
+# Runs after the "CI" workflow finishes, so it works without branch protection
+# (which the Free plan doesn't offer on private repos). It never checks out PR
+# code; it only merges the exact commit CI tested.
+name: Dependabot auto-merge
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  merge:
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.actor.login == 'dependabot[bot]' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Merge if patch or minor
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.event.workflow_run.head_branch }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          pr=$(gh pr list -R "$REPO" --head "$BRANCH" --author app/dependabot --state open \
+                 --json number,headRefOid --jq ".[] | select(.headRefOid == \"$SHA\") | .number")
+          if [ -z "$pr" ]; then echo "No open Dependabot PR at $SHA (closed, or a newer commit exists)."; exit 0; fi
+
+          text=$(gh pr view "$pr" -R "$REPO" --json body --jq .body)
+          # Only Dependabot's own "Bumps ..." / "Updates `x` ..." lines - not release notes.
+          bumps=$(grep -E '^(Bumps|Updates) ' <<<"$text" \
+                    | grep -oE 'from v?[0-9]+\.[0-9]+[^ ]* to v?[0-9]+\.[0-9]+' | sort -u || true)
+          if [ -z "$bumps" ]; then echo "PR #$pr: couldn't read versions - leaving for review."; exit 0; fi
+
+          while read -r _ from _ to; do
+            IFS=. read -r fmaj fmin _ <<<"${from#v}"
+            IFS=. read -r tmaj tmin _ <<<"${to#v}"
+            if [ "$fmaj" != "$tmaj" ] || { [ "$fmaj" = 0 ] && [ "$fmin" != "$tmin" ]; }; then
+              echo "PR #$pr: major update ($from -> $to) - leaving for review."
+              exit 0
+            fi
+          done <<<"$bumps"
+
+          echo "PR #$pr: patch/minor and CI green - merging."
+          gh pr merge "$pr" -R "$REPO" --squash --match-head-commit "$SHA"
