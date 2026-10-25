@@ -1,0 +1,17 @@
+# Dependabot: security updates only, grouped to keep PRs (and CI minutes) down.
+# - Patch/minor security fixes are bundled into one PR per directory and
+#   merged automatically by dependabot-automerge.yml once CI is green.
+# - Major security fixes still arrive as their own PR for a human to review.
+# - open-pull-requests-limit: 0 turns off routine (non-security) version bumps.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directories: ["/"]
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+    groups:
+      security-patch-minor:
+        applies-to: security-updates
+        patterns: ["*"]
+        update-types: [minor, patch]
